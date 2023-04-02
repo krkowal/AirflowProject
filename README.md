@@ -9,12 +9,19 @@
 `docker compose up airflow-init`
 
 3. Set up venv -> add python interpreter -> new venv
-4. Install airflow package
+
+4. Use requirements.txt to install all packages:
+
+- `pip install -r requirements.txt`
+
+Or follow steps 5 and 6
+
+5. Install airflow package
 
 - pycharm: python packages -> search apache-airflow -> install
 - or `pip install apache-airflow`
 
-4. Install apache-airflow-providers-postgres package using pip or pycharm packages
+6. Install apache-airflow-providers-postgres package using pip or pycharm packages
 
 - <span style="color:red">If it does not show up - restart IDE</span>.
 
