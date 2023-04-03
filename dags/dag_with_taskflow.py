@@ -12,7 +12,8 @@ default_args = {
 @dag(dag_id='dag_with_airflow_api',
      default_args=default_args,
      start_date=datetime(2023, 3, 31),
-     schedule_interval='@daily'
+     schedule_interval='@daily',
+     tags=["python"]
      )
 def hello_world_etl():
     @task(multiple_outputs=True)

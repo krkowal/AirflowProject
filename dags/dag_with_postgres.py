@@ -13,7 +13,8 @@ with DAG(
         default_args=default_args,
         start_date=datetime(2023, 4, 2),
         catchup=False,
-        schedule_interval='@daily'
+        schedule_interval='@daily',
+        tags=["postgres"]
 ) as dag:
     task1 = PostgresOperator(
         task_id='create_postgres_table',

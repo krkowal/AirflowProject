@@ -31,7 +31,8 @@ with DAG(
         dag_id='python_operators_example',
         description='first dag with python operator',
         start_date=datetime(2023, 3, 30),
-        schedule_interval='@daily'
+        schedule_interval='@daily',
+        tags=["python"]
 ) as dag:
     task1 = PythonOperator(
         task_id='greeting',

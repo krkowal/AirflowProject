@@ -13,7 +13,8 @@ with DAG(dag_id='Bash_operators_example',
          default_args=default_args,
          description='Bash example',
          start_date=datetime(2023, 3, 30),
-         schedule_interval='@daily') \
+         schedule_interval='@daily',
+         tags=["bash"]) \
         as dag:
     task1 = BashOperator(
         task_id='first_task',
