@@ -1,7 +1,8 @@
 # Instalation
 
-1. Check docker compose version
+1. Check docker compose and python version
    `docker --version` must be v1.29+
+   `python --version` must be 3.10.7+
 2. Create docker container
    `docker compose up airflow-init`
 3. Set up venv -> add python interpreter -> new venv
@@ -41,4 +42,4 @@ credentials:
 
 # Google drive api
 
-
+https://developers.google.com/drive/api/quickstart/python?hl=pl

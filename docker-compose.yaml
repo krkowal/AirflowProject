@@ -67,6 +67,8 @@ x-airflow-common:
     - ./config/airflow.cfg:/opt/airflow/airflow.cfg
     - ./auth:/opt/airflow/auth
     - ./images:/opt/airflow/images
+    - ./csv:/opt/airflow/csv
+  #    - ./src:/src
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
