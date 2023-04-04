@@ -11,6 +11,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://ww
           'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
 
 
+# TODO learn about packages and modules with __init__
 def _check_credentials():
     creds = None
     if os.path.exists('/opt/airflow/auth/token.json'):
@@ -31,23 +32,6 @@ def _check_credentials():
 
 
 def send_image_from_disk(file_name, mimetype='image/jpg', ):
-    """Shows basic usage of the Drive v3 API.
-    Prints the names and ids of the first 10 files the user has access to.
-    """
-    # try:
-    #     service = _check_credentials()
-    #
-    #     file_metadata = {'name': file_name}
-    #     media = MediaFileUpload(f'/opt/airflow/images/{file_name}',
-    #                             mimetype=mimetype)
-    #
-    #     file = service.files().create(body=file_metadata, media_body=media,
-    #                                   fields='id').execute()
-    #     print(F'File ID: {file.get("id")}')
-    #
-    # except HttpError as error:
-    #     print(f'An error occurred: {error}')
-
     _send_file_from_disk(
         file_metadata={
             'name': file_name,
@@ -69,6 +53,7 @@ def send_csv_from_disk(file_name):
 
 
 def _send_file_from_disk(file_metadata, path, mimetype):
+    # TODO add possible folder path to root and then create folders or detect if folders exist
     try:
         service = _check_credentials()
 
@@ -81,3 +66,30 @@ def _send_file_from_disk(file_metadata, path, mimetype):
 
     except HttpError as error:
         print(f'An error occurred: {error}')
+
+
+def debug():
+    # try:
+    #     service = _check_credentials()
+    # types = service.files().get
+    pass
+
+
+def create_google_drive_folder(folder_name):
+    service = _check_credentials()
+    folder_metadata = {
+        'name': folder_name,
+        'mimeType': "application/vnd.google-apps.folder"
+    }
+    folder = service.files().create(body=folder_metadata, fields='id').execute()
+    return folder.get('id')
+
+
+def folder_exists(folder_name):
+    service = _check_credentials()
+    # TODO check if folder exists
+    folder = service.files().list(q="mimeType='application/vnd.google-apps.folder'",
+                                  spaces="drive",
+                                  )
+
+
