@@ -1,7 +1,7 @@
 from airflow.decorators import task
 from airflow import DAG
 from datetime import timedelta, datetime
-from src.google_drive_handler import send_csv_from_disk
+from src.google_drive_handler import _folder_exists
 
 default_args = {
     'owner': 'kowal',
@@ -10,7 +10,7 @@ default_args = {
 }
 
 with DAG(
-        dag_id='send_csv_to_google_drive',
+        dag_id='check_if_folder_exists',
         default_args=default_args,
         catchup=False,
         start_date=datetime(2023, 4, 4),
@@ -18,8 +18,8 @@ with DAG(
         tags=['google_drive']
 ) as dag:
     @task()
-    def send_csv():
-        send_csv_from_disk('test_file.csv')
+    def check_if_folder_exists():
+        return _folder_exists('airflow')
 
 
-    send_csv()
+    check_if_folder_exists()

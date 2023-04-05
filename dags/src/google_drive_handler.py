@@ -10,6 +10,11 @@ from googleapiclient.http import MediaFileUpload
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
           'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
 
+EXTENSION_MAPPER = {
+    'jpg': 'images',
+    'csv': 'csv',
+}
+
 
 # TODO learn about packages and modules with __init__
 def _check_credentials():
@@ -36,7 +41,7 @@ def send_image_from_disk(file_name, mimetype='image/jpg', ):
         file_metadata={
             'name': file_name,
         },
-        path=f'images/{file_name}',
+        path=file_name,
         mimetype=mimetype
     )
 
@@ -47,49 +52,77 @@ def send_csv_from_disk(file_name):
             'name': file_name,
             'mimeType': 'application/vnd.google-apps.spreadsheet'
         },
-        path=f'csv/{file_name}',
+        path=file_name,
         mimetype='text/csv'
     )
 
 
 def _send_file_from_disk(file_metadata, path, mimetype):
-    # TODO add possible folder path to root and then create folders or detect if folders exist
+    """it turned out that google doesn't allow to create multiparent files
+     so files can only have now 1 parent - e.g. 'images/kotek.jpg' and not images/cats/kotek.jpg
+     so this function only works when there is only 1 parent,
+     otherwise it will raise 403 error and create only flat folders"""
     try:
         service = _check_credentials()
+        folder_path, file_name = __split_path(path)
 
-        media = MediaFileUpload(f'/opt/airflow/{path}',
+        parents = []
+        if folder_path is not None:
+            for folder in folder_path:
+                folder_id = _folder_exists(folder)
+                if folder_id is None:
+                    folder_id = create_google_drive_folder(folder, parents)
+                parents.append(folder_id)
+
+        file_metadata_with_parents = file_metadata
+        file_metadata_with_parents['parents'] = parents
+        file_metadata_with_parents['name'] = file_name
+        media = MediaFileUpload(f'/opt/airflow/{EXTENSION_MAPPER[file_name.split(".")[1]]}/{file_name}',
                                 mimetype=mimetype)
 
-        file = service.files().create(body=file_metadata, media_body=media,
+        file = service.files().create(body=file_metadata_with_parents, media_body=media,
                                       fields='id').execute()
         print(F'File ID: {file.get("id")}')
 
     except HttpError as error:
-        print(f'An error occurred: {error}')
+        raise HttpError(f'An error occurred: {error}')
+
+
+def __split_path(path):
+    paths = path.split("/")
+    if len(paths) == 1:
+        return None, paths[0]
+    else:
+        return paths[:-1], paths[-1]
 
 
 def debug():
-    # try:
-    #     service = _check_credentials()
-    # types = service.files().get
     pass
 
 
-def create_google_drive_folder(folder_name):
+def create_google_drive_folder(folder_name, parents):
     service = _check_credentials()
     folder_metadata = {
         'name': folder_name,
-        'mimeType': "application/vnd.google-apps.folder"
+        'mimeType': "application/vnd.google-apps.folder",
+        'parents': [parents]
     }
     folder = service.files().create(body=folder_metadata, fields='id').execute()
     return folder.get('id')
 
 
-def folder_exists(folder_name):
+def _folder_exists(folder_name):
     service = _check_credentials()
-    # TODO check if folder exists
-    folder = service.files().list(q="mimeType='application/vnd.google-apps.folder'",
-                                  spaces="drive",
-                                  )
-
-
+    page_token = None
+    response = service.files().list(
+        q=f"mimeType='application/vnd.google-apps.folder' and name = '{folder_name}' and trashed = false",
+        spaces="drive",
+        fields='nextPageToken, '
+               'files(id, name)',
+        pageToken=page_token
+    ).execute()
+    folders = response.get('files', [])
+    if len(folders) == 0:
+        return None
+    else:
+        return folders[0].get('id')
