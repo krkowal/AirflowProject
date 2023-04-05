@@ -2,8 +2,6 @@ from __future__ import print_function
 
 from datetime import timedelta, datetime
 
-from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaFileUpload
 from airflow.decorators import dag, task
 from src.google_drive_handler import send_image_from_disk
 
@@ -29,7 +27,7 @@ default_args = {
 def send_file_to_google_drive():
     @task()
     def send_file():
-        send_image_from_disk('kotek/kotek.jpg')
+        send_image_from_disk('kotek1/kotek2/kotek3/kotek.jpg')
 
     send_file()
 

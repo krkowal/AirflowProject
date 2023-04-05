@@ -37,6 +37,8 @@ def _check_credentials():
 
 
 def send_image_from_disk(file_name, mimetype='image/jpg', ):
+    """Cannot concurrently create 2 folders of the same name.
+    If it happens, there will be 2 folders of the same name and each file will be in separate folder"""
     _send_file_from_disk(
         file_metadata={
             'name': file_name,
@@ -47,6 +49,8 @@ def send_image_from_disk(file_name, mimetype='image/jpg', ):
 
 
 def send_csv_from_disk(file_name):
+    """Cannot concurrently create 2 folders of the same name.
+    If it happens, there will be 2 folders of the same name and each file will be in separate folder"""
     _send_file_from_disk(
         file_metadata={
             'name': file_name,
@@ -58,10 +62,6 @@ def send_csv_from_disk(file_name):
 
 
 def _send_file_from_disk(file_metadata, path, mimetype):
-    """it turned out that google doesn't allow to create multiparent files
-     so files can only have now 1 parent - e.g. 'images/kotek.jpg' and not images/cats/kotek.jpg
-     so this function only works when there is only 1 parent,
-     otherwise it will raise 403 error and create only flat folders"""
     try:
         service = _check_credentials()
         folder_path, file_name = __split_path(path)
@@ -72,7 +72,7 @@ def _send_file_from_disk(file_metadata, path, mimetype):
                 folder_id = _folder_exists(folder)
                 if folder_id is None:
                     folder_id = create_google_drive_folder(folder, parents)
-                parents.append(folder_id)
+                parents = [folder_id]
 
         file_metadata_with_parents = file_metadata
         file_metadata_with_parents['parents'] = parents
@@ -105,9 +105,9 @@ def create_google_drive_folder(folder_name, parents):
     folder_metadata = {
         'name': folder_name,
         'mimeType': "application/vnd.google-apps.folder",
-        'parents': [parents]
+        'parents': parents
     }
-    folder = service.files().create(body=folder_metadata, fields='id').execute()
+    folder = service.files().create(body=folder_metadata, fields='id,parents').execute()
     return folder.get('id')
 
 

@@ -18,8 +18,13 @@ with DAG(
         tags=['google_drive']
 ) as dag:
     @task()
-    def send_csv():
-        send_csv_from_disk('test_file.csv')
+    def send_csv(path):
+        send_csv_from_disk(path)
 
 
-    send_csv()
+    @task()
+    def second_send_csv(path):
+        send_csv_from_disk(path)
+
+
+    send_csv('csv1/csv2/test_file.csv') >> second_send_csv('csv1/csv3/test2.csv')
