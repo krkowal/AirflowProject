@@ -3,7 +3,7 @@ from __future__ import print_function
 from datetime import timedelta, datetime
 
 from airflow.decorators import dag, task
-from src.google_drive_handler import send_image_from_disk
+from src.google_drive_handler import delete_from_google_drive
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
@@ -17,19 +17,19 @@ default_args = {
 
 
 @dag(
-    dag_id='send_image_to_google_drive',
+    dag_id='delete_file_from_google_drive',
     tags=['google_drive'],
     default_args=default_args,
     start_date=datetime(2023, 4, 4),
     catchup=False,
     schedule_interval='@daily'
 )
-def send_file_to_google_drive():
+def delete_file_google_drive():
     @task()
-    def send_file():
-        send_image_from_disk('kotek.jpg')
+    def delete_file():
+        delete_from_google_drive('kotek.jpg')
 
-    send_file()
+    delete_file()
 
 
-t = send_file_to_google_drive()
+t = delete_file_google_drive()

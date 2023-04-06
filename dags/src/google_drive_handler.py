@@ -16,8 +16,9 @@ EXTENSION_TO_AIRFLOW_FOLDER_MAPPER = {
 }
 
 EXTENSION_TO_MIMETYPE_MAPPER = {
-    'folder': 'application/vnd.google-apps.folder'
-
+    'folder': 'application/vnd.google-apps.folder',
+    'jpg': 'image/jpg',
+    'csv': 'application/vnd.google-apps.spreadsheet'
 }
 
 
@@ -75,9 +76,9 @@ def _send_file_from_disk(file_metadata, path, mimetype):
         if folder_path is not None:
             for folder in folder_path:
                 if len(parents) != 0:
-                    folder_id = _folder_exists(folder, parents[0])
+                    folder_id = _file_exists(folder, parents[0])
                 else:
-                    folder_id = _folder_exists(folder, None)
+                    folder_id = _file_exists(folder, None)
                 if folder_id is None:
                     folder_id = create_google_drive_folder(folder, parents)
                 parents = [folder_id]
@@ -122,6 +123,9 @@ def create_google_drive_folder(folder_name, parents):
 
 
 def _folder_exists(folder_name, parent):
+    """
+    @deprecated method. Use _file_exists() instead
+    """
     service = _check_credentials()
     parent_query = ""
     if parent is not None:
@@ -142,18 +146,65 @@ def _folder_exists(folder_name, parent):
         return folders[-1].get('id')
 
 
-def _delete_from_google_drive(path):
+def delete_from_google_drive(path):
+    # TODO debug checking for file
+    # TODO test with csv
+    # TODO test with folders
+    # TODO test with subfolders
+    # TODO test with subfolders of the same name
     try:
         service = _check_credentials()
         folder_path, file_name = __split_path(path)
-        correct_query = True
+        file_exists = True
         parents = []
+
         if folder_path is not None:
             for folder in folder_path:
-                if _folder_exists():
-                    pass
+                if len(parents) != 0:
+                    folder_id = _file_exists(folder, parents[0])
+                else:
+                    folder_id = _file_exists(folder, None)
+                if folder_id is None:
+                    file_exists = False
+                parents = [folder_id]
 
+        if len(parents) != 0:
+            file_id = _file_exists(file_name, parents[0])
         else:
-            service.files().list(q='')
+            file_id = _file_exists(file_name, None)
+
+        if file_id is None:
+            file_exists = False
+        if file_exists:
+            service.files().delete(body={'fileId': file_id}).execute()
+        else:
+            print("File does not exist")
+
     except HttpError as error:
         raise HttpError(f"Error occurred: {error}")
+
+
+def _file_exists(file_name, parent):
+    service = _check_credentials()
+
+    if '.' not in file_name:
+        mimetype = 'application/vnd.google-apps.folder'
+    else:
+        mimetype = EXTENSION_TO_MIMETYPE_MAPPER[file_name.split(".")[1]]
+    parent_query = ""
+    if parent is not None:
+        parent_query = f" and '{parent}' in parents"
+    page_token = None
+    response = service.files().list(
+        q=f"mimeType='{mimetype}' and name = '{file_name}' and trashed = false{parent_query}",
+        spaces="drive",
+        fields='nextPageToken, '
+               'files(id, name, parents)',
+        pageToken=page_token
+    ).execute()
+    file = response.get('files', [])
+    print(file)
+    if len(file) == 0:
+        return None
+    else:
+        return file[-1].get('id')
