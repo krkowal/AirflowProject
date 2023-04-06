@@ -62,6 +62,10 @@ def send_csv_from_disk(file_name):
 
 
 def _send_file_from_disk(file_metadata, path, mimetype):
+    """
+    TODO u cannot create 2 folders of the same name: csv1/csv2/csv2/file will be created as csv1/csv2/file
+    TODO must add parent to query in _folder_exists()
+    """
     try:
         service = _check_credentials()
         folder_path, file_name = __split_path(path)
@@ -126,3 +130,17 @@ def _folder_exists(folder_name):
         return None
     else:
         return folders[0].get('id')
+
+
+def _delete_from_google_drive(path):
+    try:
+        service = _check_credentials()
+        folder_path, file_name = __split_path(path)
+        correct_query = True
+        parents = []
+        if folder_path is not None:
+            for folder in folder_path:
+                if _folder_exists():
+                    pass
+    except HttpError as error:
+        raise HttpError(f"Error occurred: {error}")
