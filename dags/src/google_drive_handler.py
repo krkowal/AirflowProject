@@ -10,9 +10,14 @@ from googleapiclient.http import MediaFileUpload
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
           'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
 
-EXTENSION_MAPPER = {
+EXTENSION_TO_AIRFLOW_FOLDER_MAPPER = {
     'jpg': 'images',
     'csv': 'csv',
+}
+
+EXTENSION_TO_MIMETYPE_MAPPER = {
+    'folder': 'application/vnd.google-apps.folder'
+
 }
 
 
@@ -62,10 +67,6 @@ def send_csv_from_disk(file_name):
 
 
 def _send_file_from_disk(file_metadata, path, mimetype):
-    """
-    TODO u cannot create 2 folders of the same name: csv1/csv2/csv2/file will be created as csv1/csv2/file
-    TODO must add parent to query in _folder_exists()
-    """
     try:
         service = _check_credentials()
         folder_path, file_name = __split_path(path)
@@ -73,7 +74,10 @@ def _send_file_from_disk(file_metadata, path, mimetype):
         parents = []
         if folder_path is not None:
             for folder in folder_path:
-                folder_id = _folder_exists(folder)
+                if len(parents) != 0:
+                    folder_id = _folder_exists(folder, parents[0])
+                else:
+                    folder_id = _folder_exists(folder, None)
                 if folder_id is None:
                     folder_id = create_google_drive_folder(folder, parents)
                 parents = [folder_id]
@@ -81,8 +85,9 @@ def _send_file_from_disk(file_metadata, path, mimetype):
         file_metadata_with_parents = file_metadata
         file_metadata_with_parents['parents'] = parents
         file_metadata_with_parents['name'] = file_name
-        media = MediaFileUpload(f'/opt/airflow/{EXTENSION_MAPPER[file_name.split(".")[1]]}/{file_name}',
-                                mimetype=mimetype)
+        media = MediaFileUpload(
+            f'/opt/airflow/{EXTENSION_TO_AIRFLOW_FOLDER_MAPPER[file_name.split(".")[1]]}/{file_name}',
+            mimetype=mimetype)
 
         file = service.files().create(body=file_metadata_with_parents, media_body=media,
                                       fields='id').execute()
@@ -112,24 +117,29 @@ def create_google_drive_folder(folder_name, parents):
         'parents': parents
     }
     folder = service.files().create(body=folder_metadata, fields='id,parents').execute()
+    print(folder)
     return folder.get('id')
 
 
-def _folder_exists(folder_name):
+def _folder_exists(folder_name, parent):
     service = _check_credentials()
+    parent_query = ""
+    if parent is not None:
+        parent_query = f" and '{parent}' in parents"
     page_token = None
     response = service.files().list(
-        q=f"mimeType='application/vnd.google-apps.folder' and name = '{folder_name}' and trashed = false",
+        q=f"mimeType='application/vnd.google-apps.folder' and name = '{folder_name}' and trashed = false{parent_query}",
         spaces="drive",
         fields='nextPageToken, '
-               'files(id, name)',
+               'files(id, name, parents)',
         pageToken=page_token
     ).execute()
     folders = response.get('files', [])
+    print(folders)
     if len(folders) == 0:
         return None
     else:
-        return folders[0].get('id')
+        return folders[-1].get('id')
 
 
 def _delete_from_google_drive(path):
@@ -142,5 +152,8 @@ def _delete_from_google_drive(path):
             for folder in folder_path:
                 if _folder_exists():
                     pass
+
+        else:
+            service.files().list(q='')
     except HttpError as error:
         raise HttpError(f"Error occurred: {error}")
