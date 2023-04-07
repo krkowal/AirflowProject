@@ -9,8 +9,8 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 
-SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
-          'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
+SCOPES: list[str] = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
+                     'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
 
 EXTENSION_TO_AIRFLOW_FOLDER_MAPPER: dict[str, str] = {
     'jpg': 'images',
@@ -27,6 +27,7 @@ MIMETYPES_TO_BE_EXTENSION_STRIPPED: list[str] = ['application/vnd.google-apps.sp
 
 
 # TODO learn about packages and modules with __init__
+
 def _check_credentials():
     """
     returns service which connects with Google Drive
@@ -47,6 +48,9 @@ def _check_credentials():
             token.write(creds.to_json())
     service = build('drive', 'v3', credentials=creds)
     return service
+
+
+SERVICE = _check_credentials()
 
 
 def send_image_from_disk(file_name: str, mimetype: str = 'image/jpg', ) -> None:
@@ -76,7 +80,7 @@ def send_csv_from_disk(file_name: str) -> None:
 
 def _send_file_from_disk(file_metadata: dict[str, str | list[str]], path: str, mimetype: str) -> None:
     try:
-        service = _check_credentials()
+        service = SERVICE
         folder_path: str | None
         file_name: str
         folder_path, file_name = __split_path(path)
@@ -120,7 +124,7 @@ def debug():
 
 
 def create_google_drive_folder(folder_name: str, parents: list[str]) -> str:
-    service = _check_credentials()
+    service = SERVICE
     folder_metadata: dict[str, str | list[str]] = {
         'name': folder_name,
         'mimeType': "application/vnd.google-apps.folder",
@@ -135,7 +139,7 @@ def _folder_exists(folder_name, parent):
     """
     @deprecated method. Use _file_exists() instead
     """
-    service = _check_credentials()
+    service = SERVICE
     parent_query = ""
     if parent is not None:
         parent_query = f" and '{parent}' in parents"
@@ -155,15 +159,27 @@ def _folder_exists(folder_name, parent):
         return folders[-1].get('id')
 
 
-def delete_from_google_drive(path) -> None:
+def delete_from_google_drive(path: str) -> None:
     try:
-        service = _check_credentials()
+        service = SERVICE
+        file_id: str = _path_exists(path)
+        if file_id is not None:
+            service.files().delete(fileId=file_id).execute()
+        else:
+            print("File does not exist")
+
+    except HttpError as error:
+        raise HttpError(f"Error occurred: {error}")
+
+
+def _path_exists(path: str) -> str | None:
+    try:
         folder_path: str | None
         file_name: str
         folder_path, file_name = __split_path(path)
         file_exists: bool = True
         parents: list[str] = []
-
+        print(file_exists)
         if folder_path is not None:
             folder_id: str
             for folder in folder_path:
@@ -174,40 +190,80 @@ def delete_from_google_drive(path) -> None:
                 if folder_id is None:
                     file_exists = False
                 parents = [folder_id]
-
+        print(file_exists)
+        print(parents)
+        if not file_exists:
+            return None
         file_id: str | None = _file_exists(file_name, parents[0]) \
             if len(parents) != 0 else _file_exists(file_name, None)
 
-        if file_id is None:
-            file_exists = False
+        if file_id is not None:
+            print(f"file exists: {file_id}")
+            return file_id
 
-        if file_exists:
-            service.files().delete(fileId=file_id).execute()
-        else:
-            print("File does not exist")
-
+        return None
     except HttpError as error:
-        raise HttpError(f"Error occurred: {error}")
+        print(f"error occured: {error}")
 
 
 def _file_exists(file_name: str, parent: str | None) -> str | None:
-    service = _check_credentials()
-    mimetype: str = 'application/vnd.google-apps.folder' if '.' not in file_name else EXTENSION_TO_MIMETYPE_MAPPER[
-        file_name.split(".")[1]]
-    if mimetype in MIMETYPES_TO_BE_EXTENSION_STRIPPED:
-        file_name = file_name.split(".")[0]
-    parent_query: str = f" and '{parent}' in parents" if parent is not None else " and 'root' in parents"
-    page_token = None
-    response = service.files().list(
-        q=f"mimeType='{mimetype}' and name = '{file_name}' and trashed = false{parent_query}",
-        spaces="drive",
-        fields='nextPageToken, '
-               'files(id, name, parents)',
-        pageToken=page_token
-    ).execute()
-    file = response.get('files', [])
-    print(file)
-    if len(file) == 0:
-        return None
-    else:
-        return file[-1].get('id')
+    try:
+        service = SERVICE
+        mimetype: str = 'application/vnd.google-apps.folder' if '.' not in file_name else EXTENSION_TO_MIMETYPE_MAPPER[
+            file_name.split(".")[1]]
+        if mimetype in MIMETYPES_TO_BE_EXTENSION_STRIPPED:
+            file_name = file_name.split(".")[0]
+        parent_query: str = f" and '{parent}' in parents" if parent is not None else " and 'root' in parents"
+        page_token = None
+        response = service.files().list(
+            q=f"mimeType='{mimetype}' and name = '{file_name}' and trashed = false{parent_query}",
+            spaces="drive",
+            fields='nextPageToken, '
+                   'files(id, name, parents)',
+            pageToken=page_token
+        ).execute()
+        file = response.get('files', [])
+        print(file)
+        if len(file) == 0:
+            return None
+        else:
+            return file[-1].get('id')
+    except HttpError as error:
+        print(f"error occurred: {error}")
+
+
+def move_file_to_folder(source_path: str, target_path: str) -> bool:
+    file_name: str = source_path.split("/")[-1]
+    target_name: str = target_path.split("/")[-1]
+    try:
+        service = SERVICE
+
+        if "." not in file_name:
+            print("Cannot move folders")
+            return False
+
+        if "." in target_name:
+            print("Cannot move files into other files")
+            return False
+
+        source_id: str | None = _path_exists(source_path)
+        if source_id is None:
+            print("Source file does not exist!")
+            return False
+
+        target_id: str = _path_exists(target_path)
+        if target_id is None:
+            print("Target folder does not exist!")
+            return False
+
+        if _path_exists(f"{target_path}/{file_name}") is not None:
+            print("File with that name already exists in target folder!")
+            return False
+
+        parent_id = service.files().get(fileId=source_id, fields='parents').execute()["parents"][0]
+        service.files().update(fileId=source_id, removeParents=parent_id, addParents=target_id,
+                               fields='id,parents').execute()
+        return True
+
+    except HttpError as error:
+        print(f"error occured: {error}")
