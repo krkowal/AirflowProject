@@ -19,9 +19,11 @@ EXTENSION_TO_AIRFLOW_FOLDER_MAPPER: dict[str, str] = {
 
 EXTENSION_TO_MIMETYPE_MAPPER: dict[str, str] = {
     'folder': 'application/vnd.google-apps.folder',
-    'jpg': 'image/jpg',
+    'jpg': 'image/jpeg',
     'csv': 'application/vnd.google-apps.spreadsheet'
 }
+
+MIMETYPES_TO_BE_EXTENSION_STRIPPED: list[str] = ['application/vnd.google-apps.spreadsheet', ]
 
 
 # TODO learn about packages and modules with __init__
@@ -154,11 +156,6 @@ def _folder_exists(folder_name, parent):
 
 
 def delete_from_google_drive(path) -> None:
-    # TODO debug checking for file
-    # TODO test with csv
-    # TODO test with folders
-    # TODO test with subfolders
-    # TODO test with subfolders of the same name
     try:
         service = _check_credentials()
         folder_path: str | None
@@ -183,8 +180,9 @@ def delete_from_google_drive(path) -> None:
 
         if file_id is None:
             file_exists = False
+
         if file_exists:
-            service.files().delete(body={'fileId': file_id}).execute()
+            service.files().delete(fileId=file_id).execute()
         else:
             print("File does not exist")
 
@@ -196,7 +194,9 @@ def _file_exists(file_name: str, parent: str | None) -> str | None:
     service = _check_credentials()
     mimetype: str = 'application/vnd.google-apps.folder' if '.' not in file_name else EXTENSION_TO_MIMETYPE_MAPPER[
         file_name.split(".")[1]]
-    parent_query: str = f" and '{parent}' in parents" if parent is not None else ""
+    if mimetype in MIMETYPES_TO_BE_EXTENSION_STRIPPED:
+        file_name = file_name.split(".")[0]
+    parent_query: str = f" and '{parent}' in parents" if parent is not None else " and 'root' in parents"
     page_token = None
     response = service.files().list(
         q=f"mimeType='{mimetype}' and name = '{file_name}' and trashed = false{parent_query}",
