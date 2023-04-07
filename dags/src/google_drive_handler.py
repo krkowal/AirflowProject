@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 from google.auth.transport.requests import Request
@@ -10,12 +12,12 @@ from googleapiclient.http import MediaFileUpload
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
           'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
 
-EXTENSION_TO_AIRFLOW_FOLDER_MAPPER = {
+EXTENSION_TO_AIRFLOW_FOLDER_MAPPER: dict[str, str] = {
     'jpg': 'images',
     'csv': 'csv',
 }
 
-EXTENSION_TO_MIMETYPE_MAPPER = {
+EXTENSION_TO_MIMETYPE_MAPPER: dict[str, str] = {
     'folder': 'application/vnd.google-apps.folder',
     'jpg': 'image/jpg',
     'csv': 'application/vnd.google-apps.spreadsheet'
@@ -24,6 +26,9 @@ EXTENSION_TO_MIMETYPE_MAPPER = {
 
 # TODO learn about packages and modules with __init__
 def _check_credentials():
+    """
+    returns service which connects with Google Drive
+    """
     creds = None
     if os.path.exists('/opt/airflow/auth/token.json'):
         creds = Credentials.from_authorized_user_file('/opt/airflow/auth/token.json', SCOPES)
@@ -42,7 +47,7 @@ def _check_credentials():
     return service
 
 
-def send_image_from_disk(file_name, mimetype='image/jpg', ):
+def send_image_from_disk(file_name: str, mimetype: str = 'image/jpg', ) -> None:
     """Cannot concurrently create 2 folders of the same name.
     If it happens, there will be 2 folders of the same name and each file will be in separate folder"""
     _send_file_from_disk(
@@ -54,7 +59,7 @@ def send_image_from_disk(file_name, mimetype='image/jpg', ):
     )
 
 
-def send_csv_from_disk(file_name):
+def send_csv_from_disk(file_name: str) -> None:
     """Cannot concurrently create 2 folders of the same name.
     If it happens, there will be 2 folders of the same name and each file will be in separate folder"""
     _send_file_from_disk(
@@ -67,12 +72,14 @@ def send_csv_from_disk(file_name):
     )
 
 
-def _send_file_from_disk(file_metadata, path, mimetype):
+def _send_file_from_disk(file_metadata: dict[str, str | list[str]], path: str, mimetype: str) -> None:
     try:
         service = _check_credentials()
+        folder_path: str | None
+        file_name: str
         folder_path, file_name = __split_path(path)
 
-        parents = []
+        parents: list[str] = []
         if folder_path is not None:
             for folder in folder_path:
                 if len(parents) != 0:
@@ -98,8 +105,8 @@ def _send_file_from_disk(file_metadata, path, mimetype):
         raise HttpError(f'An error occurred: {error}')
 
 
-def __split_path(path):
-    paths = path.split("/")
+def __split_path(path: str) -> tuple[list[str] | None, str]:
+    paths: list[str] = path.split("/")
     if len(paths) == 1:
         return None, paths[0]
     else:
@@ -110,9 +117,9 @@ def debug():
     pass
 
 
-def create_google_drive_folder(folder_name, parents):
+def create_google_drive_folder(folder_name: str, parents: list[str]) -> str:
     service = _check_credentials()
-    folder_metadata = {
+    folder_metadata: dict[str, str | list[str]] = {
         'name': folder_name,
         'mimeType': "application/vnd.google-apps.folder",
         'parents': parents
@@ -146,7 +153,7 @@ def _folder_exists(folder_name, parent):
         return folders[-1].get('id')
 
 
-def delete_from_google_drive(path):
+def delete_from_google_drive(path) -> None:
     # TODO debug checking for file
     # TODO test with csv
     # TODO test with folders
@@ -154,11 +161,14 @@ def delete_from_google_drive(path):
     # TODO test with subfolders of the same name
     try:
         service = _check_credentials()
+        folder_path: str | None
+        file_name: str
         folder_path, file_name = __split_path(path)
-        file_exists = True
-        parents = []
+        file_exists: bool = True
+        parents: list[str] = []
 
         if folder_path is not None:
+            folder_id: str
             for folder in folder_path:
                 if len(parents) != 0:
                     folder_id = _file_exists(folder, parents[0])
@@ -168,10 +178,8 @@ def delete_from_google_drive(path):
                     file_exists = False
                 parents = [folder_id]
 
-        if len(parents) != 0:
-            file_id = _file_exists(file_name, parents[0])
-        else:
-            file_id = _file_exists(file_name, None)
+        file_id: str | None = _file_exists(file_name, parents[0]) \
+            if len(parents) != 0 else _file_exists(file_name, None)
 
         if file_id is None:
             file_exists = False
@@ -184,16 +192,11 @@ def delete_from_google_drive(path):
         raise HttpError(f"Error occurred: {error}")
 
 
-def _file_exists(file_name, parent):
+def _file_exists(file_name: str, parent: str | None) -> str | None:
     service = _check_credentials()
-
-    if '.' not in file_name:
-        mimetype = 'application/vnd.google-apps.folder'
-    else:
-        mimetype = EXTENSION_TO_MIMETYPE_MAPPER[file_name.split(".")[1]]
-    parent_query = ""
-    if parent is not None:
-        parent_query = f" and '{parent}' in parents"
+    mimetype: str = 'application/vnd.google-apps.folder' if '.' not in file_name else EXTENSION_TO_MIMETYPE_MAPPER[
+        file_name.split(".")[1]]
+    parent_query: str = f" and '{parent}' in parents" if parent is not None else ""
     page_token = None
     response = service.files().list(
         q=f"mimeType='{mimetype}' and name = '{file_name}' and trashed = false{parent_query}",
