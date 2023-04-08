@@ -267,3 +267,11 @@ def move_file_to_folder(source_path: str, target_path: str) -> bool:
 
     except HttpError as error:
         print(f"error occured: {error}")
+
+
+def delete_trash() -> None:
+    try:
+        service = SERVICE
+        service.files().emptyTrash().execute()
+    except HttpError as error:
+        print(f"error occurred: {error}")
