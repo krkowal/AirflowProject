@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 
 from google.auth.transport.requests import Request
@@ -7,7 +8,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 SCOPES: list[str] = ['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive',
                      'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive.appdata']
@@ -23,6 +24,10 @@ EXTENSION_TO_MIMETYPE_MAPPER: dict[str, str] = {
     'csv': 'application/vnd.google-apps.spreadsheet'
 }
 
+"""
+Some files with google mimetypes are stripped of their extension when saving to Google Drive, so in order to find them
+it is needed to strip files of their extension.
+"""
 MIMETYPES_TO_BE_EXTENSION_STRIPPED: list[str] = ['application/vnd.google-apps.spreadsheet', ]
 
 
@@ -275,3 +280,73 @@ def delete_trash() -> None:
         service.files().emptyTrash().execute()
     except HttpError as error:
         print(f"error occurred: {error}")
+
+
+def __list_files(startpath):
+    for root, dirs, files in os.walk(startpath):
+        level = root.replace(startpath, '').count(os.sep)
+        indent = ' ' * 4 * (level)
+        print('{}{}/'.format(indent, os.path.basename(root)))
+        subindent = ' ' * 4 * (level + 1)
+        for f in files:
+            print('{}{}'.format(subindent, f))
+
+
+def _download_file_from_google_drive(path: str, path_to_store: str = "", func=None) -> bool:
+    """
+    Downloads file from Google Drive to local airflow folders -> local (project) folders
+    (because local folders are mounted in airflow folders)
+
+    Parameters:
+    path: str - path to google drive file e.g. folder1/folder2/file.extension
+    path_to_store: str | default "" - path in which file will be stored locally.
+                                      MUST START WITH '/'! e.g. /folder1/folder2
+                                      Target folder must be created beforehand
+    func - request function that depends on file type in Google Drive.
+           files:get_media (default) must be used when downloading not Google files e.g. jpg or plain csv file.
+           files:export must be used when downloading e.g. spreadsheets
+    """
+    try:
+        service = SERVICE
+        file_name = path.split("/")[-1]
+        if "." not in file_name:
+            print("Cannot download folder")
+            return False
+        file_id = _path_exists(path)
+        if file_id is None:
+            print("File does not exist!")
+            return False
+
+        request = service.files().get_media(fileId=file_id) if func is None else func(file_id)
+
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fd=fh, request=request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            print(F'Download {int(status.progress() * 100)}.')
+        fh.seek(0)
+        with open(
+                os.path.join(
+                    f'/opt/airflow/{EXTENSION_TO_AIRFLOW_FOLDER_MAPPER[file_name.split(".")[1]]}{path_to_store}',
+                    file_name),
+                'wb') as f:
+            f.write(fh.read())
+            f.close()
+        __list_files("/opt/airflow")
+        return True
+    except HttpError as error:
+        print(f"error occurred: {error}")
+
+
+def download_csv_from_spreadsheet(path: str, path_to_store: str = "") -> bool:
+    service = SERVICE
+
+    def download(file_id):
+        return service.files().export(fileId=file_id, mimeType='text/csv')
+
+    return _download_file_from_google_drive(path, path_to_store, download)
+
+
+def download_jpg_file(path: str, path_to_store: str) -> bool:
+    return _download_file_from_google_drive(path, path_to_store)
