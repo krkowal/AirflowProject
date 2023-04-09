@@ -27,9 +27,14 @@ default_args = {
 def send_file_to_google_drive():
     @task()
     def send_file():
-        send_image_from_disk('kotek.jpg')
+        send_image_from_disk('kotek1/kotek2/kotek3/kotek.jpg')
+
+    @task()
+    def send_second_file():
+        send_image_from_disk('kotek1/kotek1/kotek.jpg')
 
     send_file()
+    # send_second_file()
 
 
 t = send_file_to_google_drive()

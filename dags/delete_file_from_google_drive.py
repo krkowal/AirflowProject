@@ -27,7 +27,7 @@ default_args = {
 def delete_file_google_drive():
     @task()
     def delete_file():
-        delete_from_google_drive('kotek.jpg')
+        delete_from_google_drive('kotek1/kotek1')
 
     delete_file()
 

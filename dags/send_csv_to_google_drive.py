@@ -27,4 +27,4 @@ with DAG(
         send_csv_from_disk(path)
 
 
-    send_csv('csv1/csv2/csv1/csv2/test_file.csv') >> second_send_csv('csv1/csv2/csv1/csv2/test2.csv')
+    send_csv('csv1/test_file.csv') >> second_send_csv('est2.csv')

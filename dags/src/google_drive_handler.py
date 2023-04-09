@@ -129,15 +129,18 @@ def debug():
 
 
 def create_google_drive_folder(folder_name: str, parents: list[str]) -> str:
-    service = SERVICE
-    folder_metadata: dict[str, str | list[str]] = {
-        'name': folder_name,
-        'mimeType': "application/vnd.google-apps.folder",
-        'parents': parents
-    }
-    folder = service.files().create(body=folder_metadata, fields='id,parents').execute()
-    print(folder)
-    return folder.get('id')
+    try:
+        service = SERVICE
+        folder_metadata: dict[str, str | list[str]] = {
+            'name': folder_name,
+            'mimeType': "application/vnd.google-apps.folder",
+            'parents': parents
+        }
+        folder = service.files().create(body=folder_metadata, fields='id,parents').execute()
+        print(folder)
+        return folder.get('id')
+    except HttpError as error:
+        print(f"error occurred: {error}")
 
 
 def _folder_exists(folder_name, parent):
