@@ -36,7 +36,7 @@ def final_dag():
 
     @task()
     def move_grzanka_image():
-        move_file_to_folder("pieski/zdjecia_grzanki/grzanka.jpg", "pieski/zdjecia_fiony/grzanka.jpg")
+        move_file_to_folder("pieski/zdjecia_grzanki/grzanka.jpg", "pieski/zdjecia_fiony")
 
     @task()
     def delete_csv():
@@ -59,12 +59,9 @@ def final_dag():
         bash_command='sleep 30'
     )
 
-    # @task
-
-    send_fiona_image >> send_grzanka_image
-    [send_csv, send_grzanka_image] >> sleep_task
-    sleep_task >> [delete_csv, move_grzanka_image]
-    move_grzanka_image >> [download_grzanka_image, download_fiona_image]
+    [send_grzanka_image() >> send_fiona_image(), send_csv()] >> sleep_task
+    sleep_task >> delete_csv() >> delete_trash_from_google_drive()
+    sleep_task >> move_grzanka_image() >> [download_grzanka_image(), download_fiona_image()]
 
 
 final_dag()
