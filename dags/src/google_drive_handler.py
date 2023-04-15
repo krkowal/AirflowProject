@@ -336,7 +336,7 @@ def _download_file_from_google_drive(path: str, path_to_store: str = "", func=No
                 'wb') as f:
             f.write(fh.read())
             f.close()
-        __list_files("/opt/airflow")
+        __list_files(f'/opt/airflow/{EXTENSION_TO_AIRFLOW_FOLDER_MAPPER[file_name.split(".")[1]]}')
         return True
     except HttpError as error:
         print(f"error occurred: {error}")
