@@ -3,8 +3,8 @@ from airflow.decorators import task, dag
 from datetime import timedelta, datetime
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from pandas import DataFrame
-from src.google_drive_handler import delete_from_google_drive, send_csv_from_disk
+import pandas as pd
+from src.google_drive_handler import delete_from_google_drive, download_csv_from_spreadsheet
 
 default_args = {
     'owner': "kowal",
@@ -23,17 +23,17 @@ default_args = {
 )
 def synchronize_postgres():
     @task()
-    def copy():
-        pg_hook: PostgresHook = PostgresHook('postgres')
-        df: DataFrame = pg_hook.get_pandas_df("select * from nazwy")
-        df.to_csv('/opt/airflow/csv/nazwy.csv', index=False)
+    def copy(path: str, path_to_store: str):
+        download_csv_from_spreadsheet(path, path_to_store)
 
     @task()
-    def synchronize_google_drive(path: str):
-        delete_from_google_drive(path)
-        send_csv_from_disk(path)
+    def synchronize_with_postgres():
+        pg_hook: PostgresHook = PostgresHook('postgres')
+        engine = pg_hook.get_sqlalchemy_engine()
+        df: pd.DataFrame = pd.read_csv('/opt/airflow/csv/to_postgres/nazwy.csv')
+        df.to_sql("kopia_nazwy", engine, if_exists='replace', index=False)
 
-    copy() >> synchronize_google_drive('synchronizations/nazwy.csv')
+    copy('synchronizations/nazwy.csv', '/to_postgres') >> synchronize_with_postgres()
 
 
 s = synchronize_postgres()
