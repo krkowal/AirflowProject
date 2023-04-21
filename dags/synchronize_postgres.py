@@ -4,7 +4,7 @@ from datetime import timedelta, datetime
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
-from src.google_drive_handler import delete_from_google_drive, download_csv_from_spreadsheet
+from src.google_drive_handler import download_csv_from_spreadsheet
 
 default_args = {
     'owner': "kowal",

@@ -31,8 +31,6 @@ it is needed to strip files of their extension.
 MIMETYPES_TO_BE_EXTENSION_STRIPPED: list[str] = ['application/vnd.google-apps.spreadsheet', ]
 
 
-# TODO learn about packages and modules with __init__
-
 def _check_credentials():
     """
     returns service which connects with Google Drive
